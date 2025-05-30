@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Alpha積分追蹤器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase SDK v9 -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+
+        // 🔥 Firebase 配置 - 請替換為您的配置
+        const firebaseConfig = {
+            // ⚠️ 請將此處替換為您的 Firebase 配置
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // 初始化 Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // 將 Firebase 實例暴露到全局
+        window.db = db;
+        window.firebaseModules = {
+            collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, onSnapshot
+        };
+        
+        console.log('🔥 Firebase 已初始化');
+    </script>
+    
+    <!-- Chart.js 圖表庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <style>
+        :root {
+            --cyber-dark: #0F172A;
+            --cyber-gray: #1E293B;
+            --cyber-light: #334155;
+            --neon-yellow: #FBBF24;
+            --neon-green: #10B981;
+            --neon-red: #EF4444;
+            --neon-blue: #3B82F6;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--cyber-dark) 0%, var(--cyber-gray) 50%, var(--cyber-light) 100%);
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .neon-glow {
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+        }
+        
+        .input-glow:focus {
+            box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.1), 0 0 15px rgba(251, 191, 36, 0.2);
+            border-color: var(--neon-yellow);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, var(--neon-yellow), #F59E0B);
+            color: #1F2937;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(45deg, #F59E0B, #D97706);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(251, 191, 36, 0.4);
+        }
+        
+        .btn-green {
+            background: linear-gradient(45deg, var(--neon-green), #059669);
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-green:hover {
+            background: linear-gradient(45deg, #059669, #047857);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+        }
+        
+        .btn-red {
+            background: linear-gradient(45deg, var(--neon-red), #DC2626);
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-red:hover {
+            background: linear-gradient(45deg, #DC2626, #B91C1C);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.4);
+        }
+        
+        .btn-blue {
+            background: linear-gradient(45deg, var(--neon-blue), #2563EB);
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-blue:hover {
+            background: linear-gradient(45deg, #2563EB, #1D4ED8);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn-gray {
+            background: linear-gradient(45deg, #6B7280, #4B5563);
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-gray:hover {
+            background: linear-gradient(45deg, #4B5563, #374151);
+            transform: translateY(-1px);
+        }
+        
+        .tab-active {
+            background: linear-gradient(45deg, var(--neon-yellow), #F59E0B);
+            color: #1F2937;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+        }
+        
+        .tab-inactive {
+            color: #9CA3AF;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-inactive:hover {
+            color: white;
+            background: rgba(75, 85, 99, 0.3);
+        }
+        
+        .record-card {
+            background: rgba(51, 65, 85, 0.5);
+            border: 1px solid rgba(75, 85, 99, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .record-card:hover {
+            background: rgba(51, 65, 85, 0.8);
+            border-color: rgba(251, 191, 36, 0.3);
+            transform: translateY(-1px);
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, var(--neon-yellow), #F59E0B, var(--neon-yellow));
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .text-neon-yellow { color: var(--neon-yellow); }
+        .text-neon-green { color: var(--neon-green); }
+        .text-neon-red { color: var(--neon-red); }
+        .text-neon-blue { color: var(--neon-blue); }
+        
+        .bg-cyber-dark { background-color: var(--cyber-dark); }
+        .bg-cyber-gray { background-color: var(--cyber-gray); }
+        .bg-cyber-light { background-color: var(--cyber-light); }
+        
+        .border-neon-yellow { border-color: var(--neon-yellow); }
+        .border-neon-green { border-color: var(--neon-green); }
+        .border-neon-red { border-color: var(--neon-red); }
+        
+        .stat-card-yellow {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05));
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        
+        .stat-card-green {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05));
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .stat-card-red {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05));
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        
+        .info-box {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.05));
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        
+        .sync-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .sync-online {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--neon-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        
+        .sync-offline {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--neon-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        
+        .sync-syncing {
+            background: rgba(251, 191, 36, 0.2);
+            color: var(--neon-yellow);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
+        
+        .pagination-btn {
+            background: rgba(75, 85, 99, 0.3);
+            border: 1px solid rgba(75, 85, 99, 0.5);
+            color: #9CA3AF;
+            transition: all 0.3s ease;
+        }
+        
+        .pagination-btn:hover {
+            background: rgba(251, 191, 36, 0.2);
+            border-color: rgba(251, 191, 36, 0.5);
+            color: var(--neon-yellow);
+        }
+        
+        .pagination-btn.active {
+            background: linear-gradient(45deg, var(--neon-yellow), #F59E0B);
+            color: #1F2937;
+            border-color: var(--neon-yellow);
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="text-white">
+    <div class="max-w-6xl mx-auto p-6">
+        
+        <!-- Header -->
+        <div class="text-center mb-12 relative z-10">
+            <h1 class="text-6xl font-bold mb-4 tracking-tight relative">
+                <span class="inline-block mr-4 text-6xl">🚀</span>
+                <span style="background: linear-gradient(45deg, var(--neon-yellow), #F97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Alpha積分追蹤器</span>
+            </h1>
+            
+            <!-- 雲端同步狀態 -->
+            <div class="mb-6">
+                <div id="syncStatus" class="sync-indicator sync-offline mx-auto">
+                    <span id="syncIcon">⚠️</span>
+                    <span id="syncText">等待Firebase連線</span>
+                </div>
+            </div>
+            
+            <!-- 目標設定 -->
+            <div class="glass-card rounded-2xl p-6 inline-block">
+                <div class="flex items-center justify-center gap-4">
+                    <span class="text-gray-300 text-lg">🎯 目標積分:</span>
+                    <input
+                        type="number"
+                        id="targetPoints"
+                        value="150"
+                        class="bg-cyber-gray text-neon-yellow px-4 py-2 rounded-xl border border-gray-600 input-glow focus:outline-none text-xl font-bold text-center w-24"
+                    />
+                    <span class="text-gray-300 text-lg">分</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div class="glass-card stat-card-yellow rounded-2xl p-6 neon-glow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm uppercase tracking-wide">15天淨積分</p>
+                        <p class="text-4xl font-bold text-neon-yellow mb-1" id="netPoints">0</p>
+                        <p class="text-gray-500 text-xs" id="dateRange">範圍: --</p>
+                        <p class="text-gray-500 text-xs" id="remainingPoints">還需 0 分</p>
+                    </div>
+                    <div class="text-5xl">🎯</div>
+                </div>
+            </div>
+            
+            <div class="glass-card stat-card-green rounded-2xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm uppercase tracking-wide">空投次數</p>
+                        <p class="text-4xl font-bold text-neon-green mb-1" id="airdropCount">0</p>
+                        <p class="text-gray-500 text-xs" id="airdropDeduction">扣 0 分</p>
+                    </div>
+                    <div class="text-5xl">🎁</div>
+                </div>
+            </div>
+
+            <div class="glass-card stat-card-red rounded-2xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm uppercase tracking-wide">總成本</p>
+                        <p class="text-4xl font-bold text-neon-red mb-1" id="totalCost">0</p>
+                        <p class="text-gray-500 text-xs">USDT</p>
+                    </div>
+                    <div class="text-5xl">💸</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="glass-card rounded-2xl p-8 mb-12">
+            <div class="flex justify-between items-center mb-4">
+                <span class="text-gray-300 text-lg">🚀 目標進度</span>
+                <span class="text-neon-yellow font-bold text-xl" id="progressText">0/150 分</span>
+            </div>
+            <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden">
+                <div id="progressBar" class="progress-bar h-4 rounded-full transition-all duration-1000" style="width: 0%"></div>
+            </div>
+            <p class="text-gray-400 text-sm mt-3" id="progressStatus">還需要 150 分達到目標</p>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="flex bg-cyber-gray rounded-2xl p-2 mb-8 gap-2">
+            <button onclick="switchTab('daily')" id="tab-daily" class="tab-btn flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all text-lg font-semibold tab-active">
+                📅 每日刷分
+            </button>
+            <button onclick="switchTab('cost')" id="tab-cost" class="tab-btn flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all text-lg font-semibold tab-inactive">
+                💸 成本追蹤
+            </button>
+            <button onclick="switchTab('airdrop')" id="tab-airdrop" class="tab-btn flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all text-lg font-semibold tab-inactive">
+                🎁 空投記錄
+            </button>
+            <button onclick="switchTab('charts')" id="tab-charts" class="tab-btn flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all text-lg font-semibold tab-inactive">
+                📊 趨勢分析
+            </button>
+            <button onclick="switchTab('analysis')" id="tab-analysis" class="tab-btn flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl transition-all text-lg font-semibold tab-inactive">
+                📈 數據導出
+            </button>
+        </div>
+
+        <!-- Content Areas -->
+        <div class="glass-card rounded-2xl p-8">
+            <!-- Daily Points Tab -->
+            <div id="daily-content" class="tab-content">
+                <h3 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    📅 每日刷分記錄
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <input type="date" id="dailyDate" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none transition-all">
+                    <input type="number" id="dailyPoints" placeholder="當日刷分" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none transition-all">
+                    <button onclick="addDailyRecord()" class="btn-primary px-6 py-3 rounded-xl text-lg">
+                        ➕ 添加記錄
+                    </button>
+                </div>
+
+                <div id="dailyRecords" class="space-y-3">
+                    <div class="text-center text-gray-500 py-8 text-lg">📝 尚無刷分記錄</div>
+                </div>
+                
+                <!-- 分頁控制 -->
+                <div id="dailyPagination" class="hidden flex justify-center items-center gap-2 mt-6">
+                    <button onclick="changeDailyPage(-1)" class="pagination-btn px-3 py-2 rounded-lg text-sm">⬅️ 上一頁</button>
+                    <span id="dailyPageInfo" class="text-gray-400 px-4">第 1 頁，共 1 頁</span>
+                    <button onclick="changeDailyPage(1)" class="pagination-btn px-3 py-2 rounded-lg text-sm">下一頁 ➡️</button>
+                </div>
+            </div>
+
+            <!-- Cost Tab -->
+            <div id="cost-content" class="tab-content hidden">
+                <h3 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    💸 成本追蹤 
+                    <span id="loadingIndicator" class="text-neon-yellow text-sm px-3 py-1 rounded-full hidden animate-pulse" style="background: rgba(251, 191, 36, 0.2);">正在獲取匯率...</span>
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <input type="date" id="costDate" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-red transition-all">
+                    <input type="number" id="costBnb" step="0.00000001" placeholder="Gas Fee (BNB)" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-red transition-all">
+                    <input type="number" id="costSlippage" step="0.00000001" placeholder="磨損 (USDT)" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-red transition-all">
+                    <button onclick="addCost()" class="btn-red px-6 py-3 rounded-xl">
+                        ➕ 添加成本
+                    </button>
+                </div>
+
+                <div id="costRecords" class="space-y-3">
+                    <div class="text-center text-gray-500 py-8 text-lg">💸 尚無成本記錄</div>
+                </div>
+                
+                <!-- 分頁控制 -->
+                <div id="costPagination" class="hidden flex justify-center items-center gap-2 mt-6">
+                    <button onclick="changeCostPage(-1)" class="pagination-btn px-3 py-2 rounded-lg text-sm">⬅️ 上一頁</button>
+                    <span id="costPageInfo" class="text-gray-400 px-4">第 1 頁，共 1 頁</span>
+                    <button onclick="changeCostPage(1)" class="pagination-btn px-3 py-2 rounded-lg text-sm">下一頁 ➡️</button>
+                </div>
+            </div>
+
+            <!-- Airdrop Tab -->
+            <div id="airdrop-content" class="tab-content hidden">
+                <h3 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    🎁 空投記錄 <span class="text-sm text-gray-400 bg-cyber-gray px-3 py-1 rounded-full">每次扣15分</span>
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <input type="date" id="airdropDate" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all">
+                    <input type="text" id="airdropToken" placeholder="代幣名稱" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all">
+                    <input type="number" id="airdropAmount" step="0.00000001" placeholder="數量" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all">
+                    <div class="flex gap-2">
+                        <input type="number" id="airdropValue" step="0.00000001" placeholder="USDT收益" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all flex-1">
+                        <button onclick="addAirdrop()" class="btn-green px-6 py-3 rounded-xl">
+                            ➕
+                        </button>
+                    </div>
+                </div>
+
+                <div id="airdropRecords" class="space-y-3">
+                    <div class="text-center text-gray-500 py-8 text-lg">🎁 尚無空投記錄</div>
+                </div>
+                
+                <!-- 分頁控制 -->
+                <div id="airdropPagination" class="hidden flex justify-center items-center gap-2 mt-6">
+                    <button onclick="changeAirdropPage(-1)" class="pagination-btn px-3 py-2 rounded-lg text-sm">⬅️ 上一頁</button>
+                    <span id="airdropPageInfo" class="text-gray-400 px-4">第 1 頁，共 1 頁</span>
+                    <button onclick="changeAirdropPage(1)" class="pagination-btn px-3 py-2 rounded-lg text-sm">下一頁 ➡️</button>
+                </div>
+            </div>
+
+            <!-- Charts Tab -->
+            <div id="charts-content" class="tab-content hidden">
+                <h3 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    📊 趨勢分析與視覺化
+                </h3>
+                
+                <!-- 快速統計概覽 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="info-box p-4 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm">本月刷分</p>
+                        <p class="text-neon-yellow text-2xl font-bold" id="monthlyPoints">0</p>
+                    </div>
+                    <div class="info-box p-4 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm">本月空投</p>
+                        <p class="text-neon-green text-2xl font-bold" id="monthlyAirdrops">0</p>
+                    </div>
+                    <div class="info-box p-4 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm">本月成本</p>
+                        <p class="text-neon-red text-2xl font-bold" id="monthlyCosts">0</p>
+                    </div>
+                    <div class="info-box p-4 rounded-xl text-center">
+                        <p class="text-gray-400 text-sm">本月ROI</p>
+                        <p class="text-neon-blue text-2xl font-bold" id="monthlyROI">0%</p>
+                    </div>
+                </div>
+                
+                <!-- 智能建議 -->
+                <div class="glass-card p-8 rounded-xl">
+                    <h4 class="text-xl font-bold mb-6 flex items-center gap-3">
+                        📋 智能分析報表
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- 月度報告 -->
+                        <div class="info-box p-6 rounded-xl">
+                            <h5 class="font-bold text-neon-blue mb-4">📅 本月總結</h5>
+                            <div id="monthlyReport" class="space-y-2 text-sm">
+                                <p>載入中...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 季度分析 -->
+                        <div class="info-box p-6 rounded-xl">
+                            <h5 class="font-bold text-neon-green mb-4">📊 季度分析</h5>
+                            <div id="quarterlyReport" class="space-y-2 text-sm">
+                                <p>載入中...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 智能建議 -->
+                        <div class="info-box p-6 rounded-xl">
+                            <h5 class="font-bold text-neon-yellow mb-4">💡 數據建議</h5>
+                            <div id="smartSuggestions" class="space-y-2 text-sm">
+                                <p>載入中...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Tab -->
+            <div id="analysis-content" class="tab-content hidden">
+                <h3 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    📈 數據分析與導出
+                </h3>
+                
+                <!-- 數據導出區域 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="info-box p-6 rounded-xl text-center">
+                        <div class="text-4xl mb-3">📊</div>
+                        <h4 class="text-neon-blue font-bold mb-3">完整數據</h4>
+                        <p class="text-sm text-blue-100 mb-4">導出所有歷史記錄，適合深度分析</p>
+                        <button onclick="exportAllData()" class="btn-blue px-6 py-2 rounded-lg w-full">
+                            下載 CSV
+                        </button>
+                    </div>
+                    
+                    <div class="info-box p-6 rounded-xl text-center">
+                        <div class="text-4xl mb-3">📅</div>
+                        <h4 class="text-neon-blue font-bold mb-3">當月數據</h4>
+                        <p class="text-sm text-blue-100 mb-4">導出本月記錄，適合月度回顧</p>
+                        <button onclick="exportMonthData()" class="btn-blue px-6 py-2 rounded-lg w-full">
+                            下載 CSV
+                        </button>
+                    </div>
+                    
+                    <div class="info-box p-6 rounded-xl text-center">
+                        <div class="text-4xl mb-3">📈</div>
+                        <h4 class="text-neon-blue font-bold mb-3">近3個月</h4>
+                        <p class="text-sm text-blue-100 mb-4">導出季度數據，適合趨勢分析</p>
+                        <button onclick="exportQuarterData()" class="btn-blue px-6 py-2 rounded-lg w-full">
+                            下載 CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Stats -->
+        <div class="glass-card rounded-2xl p-8 mt-12">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold flex items-center gap-3">📊 15天詳細統計</h3>
+                <div class="flex gap-2">
+                    <button onclick="clearAllData()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                        🗑️ 清除所有數據
+                    </button>
+                </div>
+            </div>
+            <p class="text-gray-400 text-sm mb-8 bg-cyber-gray px-4 py-2 rounded-lg" id="statsDateRange">統計範圍: -- (前15天，不含今日)</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">刷分總計:</span>
+                        <span class="text-neon-yellow font-bold text-lg" id="statsGrossPoints">0 分</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">空投扣分:</span>
+                        <span class="text-neon-red font-bold text-lg" id="statsAirdropDeducted">-0 分</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">淨積分:</span>
+                        <span class="text-neon-green font-bold text-lg" id="statsNetPoints">0 分</span>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">空投收益:</span>
+                        <span class="text-neon-green font-bold text-lg" id="statsAirdropRevenue">0 USDT</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">總成本:</span>
+                        <span class="text-neon-red font-bold text-lg" id="statsTotalCost">0 USDT</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">淨收益:</span>
+                        <span class="text-neon-blue font-bold text-lg" id="statsNetRevenue">0 USDT</span>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">目標設定:</span>
+                        <span class="text-neon-yellow font-bold text-lg" id="statsTarget">150 分</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">距離目標:</span>
+                        <span class="text-neon-blue font-bold text-lg" id="statsRemaining">150 分</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">空投總數:</span>
+                        <span class="text-neon-green font-bold text-lg" id="statsAirdropTotal">0 次</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🔥 Firebase 雲端同步版本
+        
+        // 數據存儲
+        let dailyRecords = [];
+        let airdrops = [];
+        let costs = [];
+        let targetPoints = 150;
+        let bnbRateCache = {};
+        let lastSelectedRateInfo = null;
+
+        // 分頁狀態
+        let dailyCurrentPage = 1;
+        let airdropCurrentPage = 1;
+        let costCurrentPage = 1;
+        const itemsPerPage = 10;
+
+        // Firebase 連線狀態
+        let isFirebaseReady = false;
+        let syncStatus = 'offline';
+
+        // 🔥 Firebase 數據同步函數
+        async function saveToFirebase(collection, data) {
+            if (!isFirebaseReady) {
+                console.log('Firebase 尚未準備好，暫存到本地');
+                return saveToLocalStorage();
+            }
+
+            try {
+                const { collection: fbCollection, addDoc, updateDoc, doc } = window.firebaseModules;
+                const docRef = await addDoc(fbCollection(window.db, collection), data);
+                console.log(`✅ 資料已同步到 Firebase: ${collection}`);
+                updateSyncStatus('online');
+                return docRef.id;
+            } catch (error) {
+                console.error('❌ Firebase 同步失敗:', error);
+                updateSyncStatus('offline');
+                saveToLocalStorage(); // 降級到本地儲存
+                throw error;
+            }
+        }
+
+        async function loadFromFirebase() {
+            if (!isFirebaseReady) {
+                console.log('Firebase 尚未準備好，從本地加載');
+                return loadFromLocalStorage();
+            }
+
+            try {
+                updateSyncStatus('syncing');
+                const { collection: fbCollection, getDocs, query, orderBy } = window.firebaseModules;
+                
+                // 加載每日記錄
+                const dailyQuery = query(fbCollection(window.db, 'dailyRecords'), orderBy('date', 'desc'));
+                const dailySnapshot = await getDocs(dailyQuery);
+                dailyRecords = dailySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // 加載空投記錄
+                const airdropQuery = query(fbCollection(window.db, 'airdrops'), orderBy('date', 'desc'));
+                const airdropSnapshot = await getDocs(airdropQuery);
+                airdrops = airdropSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // 加載成本記錄
+                const costQuery = query(fbCollection(window.db, 'costs'), orderBy('date', 'desc'));
+                const costSnapshot = await getDocs(costQuery);
+                costs = costSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // 加載設定
+                const settingsSnapshot = await getDocs(fbCollection(window.db, 'settings'));
+                if (!settingsSnapshot.empty) {
+                    const settings = settingsSnapshot.docs[0].data();
+                    targetPoints = settings.targetPoints || 150;
+                    bnbRateCache = settings.bnbRateCache || {};
+                    lastSelectedRateInfo = settings.lastSelectedRateInfo || null;
+                }
+
+                console.log(`🔥 從 Firebase 加載數據: ${dailyRecords.length}筆刷分, ${airdrops.length}筆空投, ${costs.length}筆成本`);
+                updateSyncStatus('online');
+            } catch (error) {
+                console.error('❌ Firebase 加載失敗:', error);
+                updateSyncStatus('offline');
+                loadFromLocalStorage(); // 降級到本地加載
+            }
+        }
+
+        // 本地儲存備份函數
+        function saveToLocalStorage() {
+            localStorage.setItem('alpha-dailyRecords', JSON.stringify(dailyRecords));
+            localStorage.setItem('alpha-airdrops', JSON.stringify(airdrops));
+            localStorage.setItem('alpha-costs', JSON.stringify(costs));
+            localStorage.setItem('alpha-settings', JSON.stringify({ 
+                targetPoints, 
+                bnbRateCache, 
+                lastSelectedRateInfo 
+            }));
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const loadedDaily = localStorage.getItem('alpha-dailyRecords');
+                const loadedAirdrops = localStorage.getItem('alpha-airdrops');
+                const loadedCosts = localStorage.getItem('alpha-costs');
+                const loadedSettings = localStorage.getItem('alpha-settings');
+                
+                dailyRecords = loadedDaily ? JSON.parse(loadedDaily) : [];
+                airdrops = loadedAirdrops ? JSON.parse(loadedAirdrops) : [];
+                costs = loadedCosts ? JSON.parse(loadedCosts) : [];
+                
+                if (loadedSettings) {
+                    const settings = JSON.parse(loadedSettings);
+                    targetPoints = settings.targetPoints || 150;
+                    bnbRateCache = settings.bnbRateCache || {};
+                    lastSelectedRateInfo = settings.lastSelectedRateInfo || null;
+                }
+                
+                console.log(`📦 從本地加載數據: ${dailyRecords.length}筆刷分, ${airdrops.length}筆空投, ${costs.length}筆成本`);
+            } catch (error) {
+                console.error('本地加載數據失敗:', error);
+            }
+        }
+
+        // 同步狀態更新
+        function updateSyncStatus(status) {
+            syncStatus = status;
+            const statusElement = document.getElementById('syncStatus');
+            const iconElement = document.getElementById('syncIcon');
+            const textElement = document.getElementById('syncText');
+            
+            switch (status) {
+                case 'online':
+                    statusElement.className = 'sync-indicator sync-online mx-auto';
+                    iconElement.textContent = '🔥';
+                    textElement.textContent = 'Firebase 已連線';
+                    break;
+                case 'syncing':
+                    statusElement.className = 'sync-indicator sync-syncing mx-auto';
+                    iconElement.textContent = '🔄';
+                    textElement.textContent = '同步中...';
+                    break;
+                case 'offline':
+                default:
+                    statusElement.className = 'sync-indicator sync-offline mx-auto';
+                    iconElement.textContent = '📱';
+                    textElement.textContent = '本地模式';
+                    break;
+            }
+        }
+
+        // 格式化加密貨幣數字
+        function formatCrypto(number) {
+            if (number === 0) return '0';
+            return parseFloat(number.toFixed(8)).toString();
+        }
+
+        // 🎯 智能中午匯率選擇邏輯
+        function selectNoonRate(prices, targetDate) {
+            console.log(`🎯 開始智能選擇 ${targetDate} 最接近台灣中午12:30的匯率...`);
+            
+            const targetNoon = new Date(targetDate + 'T04:30:00.000Z');
+            const targetTimestamp = targetNoon.getTime();
+            
+            console.log(`🕐 目標時間: 台灣 ${targetDate} 12:30 (UTC ${targetNoon.toISOString()})`);
+            console.log(`📊 分析 ${prices.length} 個價格點...`);
+            
+            let bestMatch = null;
+            let minTimeDiff = Infinity;
+            
+            prices.forEach((price, index) => {
+                const priceTimestamp = price[0];
+                const priceRate = price[1];
+                const timeDiff = Math.abs(priceTimestamp - targetTimestamp);
+                
+                const taipeiTime = new Date(priceTimestamp);
+                const taipeiHours = (taipeiTime.getUTCHours() + 8) % 24;
+                const taipeiMinutes = taipeiTime.getUTCMinutes();
+                const timeStr = `${taipeiHours.toString().padStart(2,'0')}:${taipeiMinutes.toString().padStart(2,'0')}`;
+                const diffMinutes = Math.round(timeDiff / 60000);
+                
+                console.log(`⏰ 價格點${index + 1}: 台北 ${timeStr} - $${priceRate.toFixed(2)} (與12:30差${diffMinutes}分鐘)`);
+                
+                if (timeDiff < minTimeDiff) {
+                    minTimeDiff = timeDiff;
+                    bestMatch = {
+                        rate: priceRate,
+                        timestamp: priceTimestamp,
+                        timeInfo: timeStr,
+                        diffMinutes: diffMinutes,
+                        targetDate: targetDate,
+                        totalPrices: prices.length,
+                        index: index + 1
+                    };
+                }
+            });
+            
+            if (bestMatch) {
+                console.log(`🏆 最佳選擇: 價格點${bestMatch.index} - 台北 ${bestMatch.timeInfo} - $${bestMatch.rate.toFixed(2)}`);
+                console.log(`✅ 與目標時間12:30差距: ${bestMatch.diffMinutes}分鐘`);
+                
+                lastSelectedRateInfo = {
+                    date: targetDate,
+                    selectedTime: bestMatch.timeInfo,
+                    selectedRate: bestMatch.rate,
+                    diffMinutes: bestMatch.diffMinutes,
+                    totalPrices: bestMatch.totalPrices,
+                    targetTime: "12:30",
+                    selectedIndex: bestMatch.index,
+                    timestamp: Date.now()
+                };
+                
+                return bestMatch;
+            } else {
+                const middleIndex = Math.floor(prices.length / 2);
+                const fallbackPrice = prices[middleIndex];
+                const fallbackTime = new Date(fallbackPrice[0]);
+                const fallbackHours = (fallbackTime.getUTCHours() + 8) % 24;
+                const fallbackMinutes = fallbackTime.getUTCMinutes();
+                const fallbackTimeStr = `${fallbackHours.toString().padStart(2,'0')}:${fallbackMinutes.toString().padStart(2,'0')}`;
+                
+                console.log(`⚡ 降級處理: 使用中間價格點${middleIndex + 1} - 台北 ${fallbackTimeStr} - $${fallbackPrice[1].toFixed(2)}`);
+                
+                lastSelectedRateInfo = {
+                    date: targetDate,
+                    selectedTime: fallbackTimeStr,
+                    selectedRate: fallbackPrice[1],
+                    diffMinutes: 'N/A',
+                    totalPrices: prices.length,
+                    targetTime: "12:30",
+                    selectedIndex: middleIndex + 1,
+                    fallback: true,
+                    timestamp: Date.now()
+                };
+                
+                return {
+                    rate: fallbackPrice[1],
+                    timeInfo: fallbackTimeStr,
+                    diffMinutes: 'N/A'
+                };
+            }
+        }
+
+        // 獲取BNB匯率
+        async function getBnbRate(date) {
+            if (bnbRateCache[date]) {
+                console.log(`📦 使用緩存匯率 ${date}: $${bnbRateCache[date]}`);
+                if (lastSelectedRateInfo && lastSelectedRateInfo.date === date) {
+                    return {
+                        rate: bnbRateCache[date],
+                        timeInfo: lastSelectedRateInfo.selectedTime,
+                        diffMinutes: lastSelectedRateInfo.diffMinutes,
+                        fromCache: true
+                    };
+                }
+                return { 
+                    rate: bnbRateCache[date], 
+                    timeInfo: '緩存數據', 
+                    diffMinutes: '未知',
+                    fromCache: true 
+                };
+            }
+            
+            try {
+                console.log(`🌐 開始獲取 ${date} 的智能中午匯率...`);
+                
+                const dayStart = new Date(date).setHours(0, 0, 0, 0);
+                const dayEnd = new Date(date).setHours(23, 59, 59, 999);
+                const fromTimestamp = Math.floor(dayStart / 1000);
+                const toTimestamp = Math.floor(dayEnd / 1000);
+                
+                const apiUrl = `https://api.coingecko.com/api/v3/coins/binancecoin/market_chart/range?vs_currency=usd&from=${fromTimestamp}&to=${toTimestamp}`;
+                console.log(`📡 API請求: ${apiUrl}`);
+                
+                const response = await fetch(apiUrl);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.prices && data.prices.length > 0) {
+                        console.log(`📊 獲得 ${data.prices.length} 個價格點`);
+                        
+                        const selectedRate = selectNoonRate(data.prices, date);
+                        
+                        bnbRateCache[date] = selectedRate.rate;
+                        saveAllData();
+                        console.log(`✅ 智能選擇 ${date} BNB匯率: $${selectedRate.rate.toFixed(2)} (台北時間 ${selectedRate.timeInfo})`);
+                        
+                        return {
+                            rate: selectedRate.rate,
+                            timeInfo: selectedRate.timeInfo,
+                            diffMinutes: selectedRate.diffMinutes,
+                            fromCache: false
+                        };
+                    }
+                }
+                
+                console.log(`⚠️ 無法獲取 ${date} 的BNB價格，使用預設值 $650`);
+                return { 
+                    rate: 650, 
+                    timeInfo: 'API異常，使用預設值', 
+                    diffMinutes: 'N/A',
+                    isDefault: true 
+                };
+            } catch (error) {
+                console.error('❌ 獲取BNB價格失敗:', error);
+                return { 
+                    rate: 650, 
+                    timeInfo: `網路錯誤: ${error.message}`, 
+                    diffMinutes: 'N/A',
+                    isError: true 
+                };
+            }
+        }
+
+        // 保存所有數據（智能選擇Firebase或本地）
+        async function saveAllData() {
+            // 總是保存到本地作為備份
+            saveToLocalStorage();
+            
+            // 如果Firebase可用，也同步到雲端
+            if (isFirebaseReady) {
+                try {
+                    // 這裡可以添加更複雜的同步邏輯
+                    console.log('🔄 正在同步到 Firebase...');
+                } catch (error) {
+                    console.error('Firebase 同步失敗，已保存到本地');
+                }
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('🚀 Alpha積分追蹤器 Firebase版初始化開始...');
+            
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('dailyDate').value = today;
+            document.getElementById('airdropDate').value = today;
+            document.getElementById('costDate').value = today;
+            
+            // 等待Firebase初始化
+            setTimeout(async () => {
+                try {
+                    if (window.db && window.firebaseModules) {
+                        isFirebaseReady = true;
+                        console.log('🔥 Firebase 連線成功');
+                        await loadFromFirebase();
+                    } else {
+                        console.log('📱 Firebase 未配置，使用本地模式');
+                        loadFromLocalStorage();
+                    }
+                } catch (error) {
+                    console.error('Firebase 初始化失敗:', error);
+                    loadFromLocalStorage();
+                }
+                
+                document.getElementById('targetPoints').value = targetPoints;
+                updateDisplay();
+            }, 1000);
+            
+            console.log('✅ Alpha積分追蹤器 Firebase版初始化完成！');
+        });
+
+        // 目標積分變更
+        document.getElementById('targetPoints').addEventListener('change', function() {
+            targetPoints = parseInt(this.value) || 150;
+            saveAllData();
+            updateDisplay();
+        });
+
+        // 標籤切換
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('tab-inactive');
+            });
+            
+            document.getElementById(tabName + '-content').classList.remove('hidden');
+            const activeTab = document.getElementById('tab-' + tabName);
+            activeTab.classList.add('tab-active');
+            activeTab.classList.remove('tab-inactive');
+            
+            if (tabName === 'charts') {
+                setTimeout(() => {
+                    try {
+                        updateMonthlyStats();
+                        generateReport();
+                    } catch (error) {
+                        console.error('❌ 圖表初始化失敗:', error);
+                    }
+                }, 300);
+            }
+        }
+
+        // 計算15天統計
+        function calculate15DayStats() {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const endDate = new Date(today - 1 * 24 * 60 * 60 * 1000);
+            const startDate = new Date(today - 15 * 24 * 60 * 60 * 1000);
+            
+            const recentPoints = dailyRecords
+                .filter(record => {
+                    const recordDate = new Date(record.date);
+                    recordDate.setHours(0, 0, 0, 0);
+                    return recordDate >= startDate && recordDate <= endDate;
+                })
+                .reduce((sum, record) => sum + record.points, 0);
+            
+            const recentAirdrops = airdrops
+                .filter(airdrop => {
+                    const airdropDate = new Date(airdrop.date);
+                    airdropDate.setHours(0, 0, 0, 0);
+                    return airdropDate >= startDate && airdropDate <= endDate;
+                })
+                .length * 15;
+            
+            const netPoints = recentPoints - recentAirdrops;
+            
+            const formatDate = (date) => `${date.getMonth() + 1}/${date.getDate()}`;
+            const dateRange = `${formatDate(startDate)} - ${formatDate(endDate)}`;
+            
+            return {
+                grossPoints: recentPoints,
+                airdropsDeducted: recentAirdrops,
+                netPoints,
+                remainingPoints: Math.max(targetPoints - netPoints, 0),
+                dateRange
+            };
+        }
+
+        // 計算總成本
+        function calculateTotalCosts() {
+            const totalGasFee = costs.reduce((sum, cost) => sum + (cost.usdtValue || 0), 0);
+            const totalSlippage = costs.reduce((sum, cost) => sum + (cost.slippage || 0), 0);
+            return { gasFee: totalGasFee, slippage: totalSlippage };
+        }
+
+        // 添加每日記錄
+        async function addDailyRecord() {
+            const date = document.getElementById('dailyDate').value;
+            const points = parseInt(document.getElementById('dailyPoints').value);
+            
+            if (!date || !points) {
+                alert('🚨 請填寫日期和刷分數');
+                return;
+            }
+            
+            const existingIndex = dailyRecords.findIndex(record => record.date === date);
+            
+            if (existingIndex !== -1) {
+                const oldPoints = dailyRecords[existingIndex].points;
+                dailyRecords[existingIndex].points = points;
+                alert(`📝 已更新 ${date} 的記錄：${oldPoints}分 → ${points}分`);
+            } else {
+                dailyRecords.push({
+                    id: Date.now(),
+                    date,
+                    points
+                });
+                alert(`📝 已新增 ${date} 的記錄：${points}分`);
+            }
+            
+            document.getElementById('dailyPoints').value = '';
+            await saveAllData();
+            updateDisplay();
+        }
+
+        // 添加空投記錄
+        async function addAirdrop() {
+            const date = document.getElementById('airdropDate').value;
+            const token = document.getElementById('airdropToken').value;
+            const amount = parseFloat(document.getElementById('airdropAmount').value);
+            const value = parseFloat(document.getElementById('airdropValue').value);
+            
+            if (!date || !token || !amount) {
+                alert('🚨 請填寫日期、代幣名稱和數量');
+                return;
+            }
+            
+            const existingIndex = airdrops.findIndex(airdrop => 
+                airdrop.date === date && airdrop.token.toLowerCase() === token.toLowerCase()
+            );
+            
+            if (existingIndex !== -1) {
+                const oldAmount = airdrops[existingIndex].amount;
+                const oldValue = airdrops[existingIndex].usdtValue;
+                airdrops[existingIndex].amount = amount;
+                airdrops[existingIndex].usdtValue = value || 0;
+                alert(`🎁 已更新 ${date} ${token} 的記錄：\n數量：${oldAmount} → ${amount}\nUSDT：${oldValue} → ${value || 0}`);
+            } else {
+                airdrops.push({
+                    id: Date.now(),
+                    date,
+                    token,
+                    amount,
+                    usdtValue: value || 0
+                });
+                alert(`🎁 已新增 ${date} ${token} 的記錄：${amount}個，價值 ${value || 0} USDT`);
+            }
+            
+            document.getElementById('airdropToken').value = '';
+            document.getElementById('airdropAmount').value = '';
+            document.getElementById('airdropValue').value = '';
+            await saveAllData();
+            updateDisplay();
+        }
+
+        // 添加成本記錄
+        async function addCost() {
+            const date = document.getElementById('costDate').value;
+            const bnbAmount = parseFloat(document.getElementById('costBnb').value);
+            const slippage = parseFloat(document.getElementById('costSlippage').value);
+            
+            if (!date || (!bnbAmount && !slippage)) {
+                alert('🚨 請填寫日期和至少一項成本');
+                return;
+            }
+            
+            let usdtValue = 0;
+            let rateInfo = { rate: 0, timeInfo: '', diffMinutes: 'N/A' };
+            
+            if (bnbAmount) {
+                if (bnbRateCache[date]) {
+                    console.log(`🗑️ 自動清除 ${date} 的緩存匯率，重新獲取中...`);
+                    delete bnbRateCache[date];
+                    delete lastSelectedRateInfo;
+                }
+                
+                document.getElementById('loadingIndicator').classList.remove('hidden');
+                rateInfo = await getBnbRate(date);
+                usdtValue = bnbAmount * rateInfo.rate;
+                document.getElementById('loadingIndicator').classList.add('hidden');
+            }
+            
+            const existingIndex = costs.findIndex(cost => cost.date === date);
+            
+            if (existingIndex !== -1) {
+                const oldBnb = costs[existingIndex].bnbAmount;
+                const oldUsdt = costs[existingIndex].usdtValue;
+                const oldSlippage = costs[existingIndex].slippage;
+                const oldRate = costs[existingIndex].bnbRate;
+                
+                costs[existingIndex].bnbAmount = bnbAmount || 0;
+                costs[existingIndex].usdtValue = usdtValue;
+                costs[existingIndex].bnbRate = rateInfo.rate;
+                costs[existingIndex].slippage = slippage || 0;
+                
+                let alertMessage = `💸 已更新 ${date} 的記錄：\n` +
+                    `BNB：${oldBnb} → ${bnbAmount || 0}\n` +
+                    `匯率：${formatCrypto(oldRate)} → ${formatCrypto(rateInfo.rate)}\n` +
+                    `USDT：${formatCrypto(oldUsdt)} → ${formatCrypto(usdtValue)}\n` +
+                    `磨損：${formatCrypto(oldSlippage)} → ${formatCrypto(slippage || 0)} USDT`;
+                
+                if (bnbAmount) {
+                    alertMessage += `\n\n🎯 智能匯率選擇過程：\n`;
+                    alertMessage += `• 目標時間：台灣 12:30\n`;
+                    alertMessage += `• 實際選擇：台灣 ${rateInfo.timeInfo}\n`;
+                    
+                    if (rateInfo.isDefault || rateInfo.isError) {
+                        alertMessage += `• 狀態：${rateInfo.isError ? '網路異常' : 'API無資料'}，使用預設匯率\n`;
+                        alertMessage += `• 備註：建議稍後重試或檢查網路連線`;
+                    } else {
+                        alertMessage += `• 時間差距：${rateInfo.diffMinutes === 'N/A' ? '降級處理' : rateInfo.diffMinutes + '分鐘'}\n`;
+                        alertMessage += `• 狀態：✅ 成功選擇最接近中午的匯率`;
+                    }
+                }
+                
+                alert(alertMessage);
+            } else {
+                costs.push({
+                    id: Date.now(),
+                    date,
+                    bnbAmount: bnbAmount || 0,
+                    usdtValue,
+                    bnbRate: rateInfo.rate,
+                    slippage: slippage || 0
+                });
+                
+                let alertMessage = `💸 已新增 ${date} 的記錄：\n` +
+                    `BNB：${bnbAmount || 0}\n` +
+                    `匯率：${formatCrypto(rateInfo.rate)}\n` +
+                    `USDT：${formatCrypto(usdtValue)}\n` +
+                    `磨損：${formatCrypto(slippage || 0)} USDT`;
+                
+                if (bnbAmount) {
+                    alertMessage += `\n\n🎯 智能匯率選擇過程：\n`;
+                    alertMessage += `• 目標時間：台灣 12:30\n`;
+                    alertMessage += `• 實際選擇：台灣 ${rateInfo.timeInfo}\n`;
+                    
+                    if (rateInfo.isDefault || rateInfo.isError) {
+                        alertMessage += `• 狀態：${rateInfo.isError ? '網路異常' : 'API無資料'}，使用預設匯率\n`;
+                        alertMessage += `• 備註：建議稍後重試或檢查網路連線`;
+                    } else {
+                        alertMessage += `• 時間差距：${rateInfo.diffMinutes === 'N/A' ? '降級處理' : rateInfo.diffMinutes + '分鐘'}\n`;
+                        alertMessage += `• 狀態：✅ 成功選擇最接近中午的匯率`;
+                    }
+                }
+                
+                alert(alertMessage);
+            }
+            
+            document.getElementById('costBnb').value = '';
+            document.getElementById('costSlippage').value = '';
+            await saveAllData();
+            updateDisplay();
+        }
+
+        // 清除所有數據
+        async function clearAllData() {
+            const confirmed = confirm(
+                '⚠️ 確定要清除所有數據嗎？\n\n這將刪除：\n• 所有每日刷分記錄\n• 所有空投記錄\n• 所有成本記錄\n• BNB匯率緩存\n\n此操作無法撤銷！'
+            );
+            
+            if (confirmed) {
+                dailyRecords = [];
+                airdrops = [];
+                costs = [];
+                bnbRateCache = {};
+                lastSelectedRateInfo = null;
+                targetPoints = 150;
+                
+                dailyCurrentPage = 1;
+                airdropCurrentPage = 1;
+                costCurrentPage = 1;
+                
+                localStorage.clear();
+                
+                document.getElementById('targetPoints').value = 150;
+                updateDisplay();
+                
+                alert('✅ 所有數據已清除！');
+            }
+        }
+
+        // 分頁功能
+        function changeDailyPage(direction) {
+            const totalPages = Math.ceil(dailyRecords.length / itemsPerPage);
+            dailyCurrentPage += direction;
+            if (dailyCurrentPage < 1) dailyCurrentPage = 1;
+            if (dailyCurrentPage > totalPages) dailyCurrentPage = totalPages;
+            updateDailyRecordsList();
+        }
+
+        function changeAirdropPage(direction) {
+            const totalPages = Math.ceil(airdrops.length / itemsPerPage);
+            airdropCurrentPage += direction;
+            if (airdropCurrentPage < 1) airdropCurrentPage = 1;
+            if (airdropCurrentPage > totalPages) airdropCurrentPage = totalPages;
+            updateAirdropsList();
+        }
+
+        function changeCostPage(direction) {
+            const totalPages = Math.ceil(costs.length / itemsPerPage);
+            costCurrentPage += direction;
+            if (costCurrentPage < 1) costCurrentPage = 1;
+            if (costCurrentPage > totalPages) costCurrentPage = totalPages;
+            updateCostsList();
+        }
+
+        // 更新月度統計
+        function updateMonthlyStats() {
+            const currentMonth = new Date().toISOString().substr(0, 7);
+            
+            const monthlyPoints = dailyRecords
+                .filter(record => record.date.startsWith(currentMonth))
+                .reduce((sum, record) => sum + record.points, 0);
+            
+            const monthlyAirdropValue = airdrops
+                .filter(airdrop => airdrop.date.startsWith(currentMonth))
+                .reduce((sum, airdrop) => sum + airdrop.usdtValue, 0);
+            
+            const monthlyCostValue = costs
+                .filter(cost => cost.date.startsWith(currentMonth))
+                .reduce((sum, cost) => sum + (cost.usdtValue || 0) + (cost.slippage || 0), 0);
+            
+            const monthlyROI = monthlyCostValue > 0 ? 
+                ((monthlyAirdropValue - monthlyCostValue) / monthlyCostValue * 100) : 0;
+            
+            document.getElementById('monthlyPoints').textContent = monthlyPoints;
+            document.getElementById('monthlyAirdrops').textContent = formatCrypto(monthlyAirdropValue);
+            document.getElementById('monthlyCosts').textContent = formatCrypto(monthlyCostValue);
+            document.getElementById('monthlyROI').textContent = monthlyROI.toFixed(1) + '%';
+        }
+
+        // 生成報表
+        function generateReport() {
+            generateMonthlyReport();
+            generateQuarterlyReport();
+            generateSmartSuggestions();
+        }
+
+        // 月度報告
+        function generateMonthlyReport() {
+            const currentMonth = new Date().toISOString().substr(0, 7);
+            const monthlyRecords = dailyRecords.filter(record => record.date.startsWith(currentMonth));
+            const monthlyAirdrops = airdrops.filter(airdrop => airdrop.date.startsWith(currentMonth));
+            
+            const totalPoints = monthlyRecords.reduce((sum, record) => sum + record.points, 0);
+            const avgDaily = monthlyRecords.length > 0 ? (totalPoints / monthlyRecords.length).toFixed(1) : 0;
+            const airdropCount = monthlyAirdrops.length;
+            const airdropValue = monthlyAirdrops.reduce((sum, airdrop) => sum + airdrop.usdtValue, 0);
+            
+            const report = `
+                <p class="text-blue-100">📊 刷分天數: ${monthlyRecords.length} 天</p>
+                <p class="text-blue-100">🎯 總積分: ${totalPoints} 分</p>
+                <p class="text-blue-100">📈 日均刷分: ${avgDaily} 分</p>
+                <p class="text-blue-100">🎁 空投次數: ${airdropCount} 次</p>
+                <p class="text-blue-100">💰 空投價值: ${formatCrypto(airdropValue)} USDT</p>
+            `;
+            
+            document.getElementById('monthlyReport').innerHTML = report;
+        }
+
+        // 季度分析
+        function generateQuarterlyReport() {
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            const cutoffDate = threeMonthsAgo.toISOString().split('T')[0];
+            
+            const quarterlyRecords = dailyRecords.filter(record => record.date >= cutoffDate);
+            const quarterlyAirdrops = airdrops.filter(airdrop => airdrop.date >= cutoffDate);
+            const quarterlyCosts = costs.filter(cost => cost.date >= cutoffDate);
+            
+            const totalPoints = quarterlyRecords.reduce((sum, record) => sum + record.points, 0);
+            const totalRevenue = quarterlyAirdrops.reduce((sum, airdrop) => sum + airdrop.usdtValue, 0);
+            const totalCosts = quarterlyCosts.reduce((sum, cost) => sum + (cost.usdtValue || 0) + (cost.slippage || 0), 0);
+            const netProfit = totalRevenue - totalCosts;
+            
+            const report = `
+                <p class="text-green-100">📅 統計期間: 近3個月</p>
+                <p class="text-green-100">🎯 累計積分: ${totalPoints} 分</p>
+                <p class="text-green-100">💰 總收益: ${formatCrypto(totalRevenue)} USDT</p>
+                <p class="text-green-100">💸 總成本: ${formatCrypto(totalCosts)} USDT</p>
+                <p class="text-green-100">📊 淨利潤: ${formatCrypto(netProfit)} USDT</p>
+            `;
+            
+            document.getElementById('quarterlyReport').innerHTML = report;
+        }
+
+        // 智能建議
+        function generateSmartSuggestions() {
+            const stats = calculate15DayStats();
+            const suggestions = [];
+            
+            if (dailyRecords.length >= 3) {
+                const userAvgPoints = dailyRecords.reduce((sum, r) => sum + r.points, 0) / dailyRecords.length;
+                const totalDays = dailyRecords.length;
+                const airdropRate = airdrops.length / totalDays;
+                const dailyAirdropPenalty = airdropRate * 15;
+                const netDailyGrowth = userAvgPoints - dailyAirdropPenalty;
+                
+                suggestions.push(`📊 平均刷分：${userAvgPoints.toFixed(1)}分/天`);
+                suggestions.push(`🎯 15天淨積分：${stats.netPoints}/${targetPoints}分`);
+                
+                if (stats.remainingPoints > 0) {
+                    const daysToTarget = Math.ceil(stats.remainingPoints / netDailyGrowth);
+                    if (daysToTarget <= 7) {
+                        suggestions.push(`⭐ 預測約${daysToTarget}天達到目標`);
+                    } else {
+                        suggestions.push(`📈 建議提高每日刷分至${(userAvgPoints + 3).toFixed(0)}分`);
+                    }
+                } else {
+                    suggestions.push(`🎉 已達成目標！超標${Math.abs(stats.remainingPoints)}分`);
+                }
+            } else {
+                suggestions.push('📊 需更多數據來生成建議');
+            }
+            
+            const suggestionHtml = suggestions.map(s => `<p class="text-yellow-100 mb-2">${s}</p>`).join('');
+            document.getElementById('smartSuggestions').innerHTML = suggestionHtml;
+        }
+
+        // 數據導出功能
+        function generateCSV(data, filename) {
+            let csv = '';
+            
+            csv += '日期,類型,項目,數值,USDT價值,匯率,備註\n';
+            
+            data.daily?.forEach(record => {
+                csv += `${record.date},刷分,每日積分,${record.points},,,""\n`;
+            });
+            
+            data.airdrops?.forEach(airdrop => {
+                csv += `${airdrop.date},空投,${airdrop.token},${formatCrypto(airdrop.amount)},${formatCrypto(airdrop.usdtValue)},,"-15分"\n`;
+            });
+            
+            data.costs?.forEach(cost => {
+                if (cost.bnbAmount > 0) {
+                    csv += `${cost.date},成本,Gas費,${formatCrypto(cost.bnbAmount)},${formatCrypto(cost.usdtValue)},${formatCrypto(cost.bnbRate)},"BNB"\n`;
+                }
+                if (cost.slippage > 0) {
+                    csv += `${cost.date},成本,磨損,${formatCrypto(cost.slippage)},${formatCrypto(cost.slippage)},,USDT\n`;
+                }
+            });
+            
+            const BOM = '\uFEFF';
+            const csvWithBOM = BOM + csv;
+            
+            const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+
+        function exportAllData() {
+            const data = {
+                daily: dailyRecords,
+                airdrops: airdrops,
+                costs: costs
+            };
+            generateCSV(data, `Alpha積分追蹤_全部數據_${new Date().toISOString().split('T')[0]}.csv`);
+        }
+
+        function exportMonthData() {
+            const currentMonth = new Date().toISOString().substr(0, 7);
+            
+            const data = {
+                daily: dailyRecords.filter(r => r.date.startsWith(currentMonth)),
+                airdrops: airdrops.filter(r => r.date.startsWith(currentMonth)),
+                costs: costs.filter(r => r.date.startsWith(currentMonth))
+            };
+            generateCSV(data, `Alpha積分追蹤_${currentMonth}_月度數據.csv`);
+        }
+
+        function exportQuarterData() {
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            const cutoffDate = threeMonthsAgo.toISOString().split('T')[0];
+            
+            const data = {
+                daily: dailyRecords.filter(r => r.date >= cutoffDate),
+                airdrops: airdrops.filter(r => r.date >= cutoffDate),
+                costs: costs.filter(r => r.date >= cutoffDate)
+            };
+            generateCSV(data, `Alpha積分追蹤_近3個月_${new Date().toISOString().split('T')[0]}.csv`);
+        }
+
+        // 更新顯示
+        function updateDisplay() {
+            const stats = calculate15DayStats();
+            const totalCosts = calculateTotalCosts();
+            
+            document.getElementById('netPoints').textContent = stats.netPoints;
+            document.getElementById('dateRange').textContent = `範圍: ${stats.dateRange}`;
+            document.getElementById('remainingPoints').textContent = `還需 ${stats.remainingPoints} 分`;
+            document.getElementById('airdropCount').textContent = airdrops.length;
+            document.getElementById('airdropDeduction').textContent = `扣 ${airdrops.length * 15} 分`;
+            document.getElementById('totalCost').textContent = formatCrypto(totalCosts.gasFee + totalCosts.slippage);
+            
+            document.getElementById('progressText').textContent = `${stats.netPoints}/${targetPoints} 分`;
+            const progressPercent = Math.min((stats.netPoints / targetPoints) * 100, 100);
+            document.getElementById('progressBar').style.width = `${progressPercent}%`;
+            
+            if (stats.remainingPoints > 0) {
+                document.getElementById('progressStatus').textContent = `還需要 ${stats.remainingPoints} 分達到目標`;
+                document.getElementById('progressStatus').className = 'text-gray-400 text-sm mt-3';
+            } else {
+                document.getElementById('progressStatus').textContent = '🎉 恭喜達成目標！';
+                document.getElementById('progressStatus').className = 'text-neon-green text-sm mt-3 font-bold';
+            }
+            
+            document.getElementById('statsDateRange').textContent = `統計範圍: ${stats.dateRange} (前15天，不含今日)`;
+            document.getElementById('statsGrossPoints').textContent = `${stats.grossPoints} 分`;
+            document.getElementById('statsAirdropDeducted').textContent = `-${stats.airdropsDeducted} 分`;
+            document.getElementById('statsNetPoints').textContent = `${stats.netPoints} 分`;
+            document.getElementById('statsTarget').textContent = `${targetPoints} 分`;
+            document.getElementById('statsRemaining').textContent = `${stats.remainingPoints} 分`;
+            document.getElementById('statsAirdropTotal').textContent = `${airdrops.length} 次`;
+            
+            const airdropRevenue = airdrops.reduce((sum, a) => sum + a.usdtValue, 0);
+            const totalCostValue = totalCosts.gasFee + totalCosts.slippage;
+            const netRevenue = airdropRevenue - totalCostValue;
+            
+            document.getElementById('statsAirdropRevenue').textContent = `${formatCrypto(airdropRevenue)} USDT`;
+            document.getElementById('statsTotalCost').textContent = `${formatCrypto(totalCostValue)} USDT`;
+            document.getElementById('statsNetRevenue').textContent = `${formatCrypto(netRevenue)} USDT`;
+            
+            updateRecordLists();
+        }
+
+        // 更新記錄列表（分頁版本）
+        function updateRecordLists() {
+            updateDailyRecordsList();
+            updateAirdropsList();
+            updateCostsList();
+        }
+
+        function updateDailyRecordsList() {
+            const container = document.getElementById('dailyRecords');
+            const pagination = document.getElementById('dailyPagination');
+            const sorted = dailyRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            if (sorted.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8 text-lg">📝 尚無刷分記錄</div>';
+                pagination.classList.add('hidden');
+                return;
+            }
+            
+            const totalPages = Math.ceil(sorted.length / itemsPerPage);
+            const startIndex = (dailyCurrentPage - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, sorted.length);
+            const pageItems = sorted.slice(startIndex, endIndex);
+            
+            container.innerHTML = pageItems.map(record => `
+                <div class="record-card p-4 rounded-xl">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300 font-medium">${record.date}</span>
+                        <span class="text-neon-yellow font-bold text-lg">+${record.points} 分</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            if (totalPages > 1) {
+                pagination.classList.remove('hidden');
+                document.getElementById('dailyPageInfo').textContent = `第 ${dailyCurrentPage} 頁，共 ${totalPages} 頁`;
+            } else {
+                pagination.classList.add('hidden');
+            }
+        }
+
+        function updateAirdropsList() {
+            const container = document.getElementById('airdropRecords');
+            const pagination = document.getElementById('airdropPagination');
+            const sorted = airdrops.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            if (sorted.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8 text-lg">🎁 尚無空投記錄</div>';
+                pagination.classList.add('hidden');
+                return;
+            }
+            
+            const totalPages = Math.ceil(sorted.length / itemsPerPage);
+            const startIndex = (airdropCurrentPage - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, sorted.length);
+            const pageItems = sorted.slice(startIndex, endIndex);
+            
+            container.innerHTML = pageItems.map(airdrop => `
+                <div class="record-card p-4 rounded-xl">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="text-neon-green font-bold text-lg">${airdrop.token}</span>
+                                <span class="text-gray-400">x${formatCrypto(airdrop.amount)}</span>
+                            </div>
+                            <span class="text-gray-500 text-sm">${airdrop.date}</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-neon-green font-bold text-lg">${formatCrypto(airdrop.usdtValue)} USDT</div>
+                            <div class="text-neon-red text-sm">-15分</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            if (totalPages > 1) {
+                pagination.classList.remove('hidden');
+                document.getElementById('airdropPageInfo').textContent = `第 ${airdropCurrentPage} 頁，共 ${totalPages} 頁`;
+            } else {
+                pagination.classList.add('hidden');
+            }
+        }
+
+        function updateCostsList() {
+            const container = document.getElementById('costRecords');
+            const pagination = document.getElementById('costPagination');
+            const sorted = costs.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            if (sorted.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8 text-lg">💸 尚無成本記錄</div>';
+                pagination.classList.add('hidden');
+                return;
+            }
+            
+            const totalPages = Math.ceil(sorted.length / itemsPerPage);
+            const startIndex = (costCurrentPage - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, sorted.length);
+            const pageItems = sorted.slice(startIndex, endIndex);
+            
+            container.innerHTML = pageItems.map(cost => `
+                <div class="record-card p-4 rounded-xl">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300 font-medium">${cost.date}</span>
+                        <div class="text-right">
+                            ${cost.bnbAmount > 0 ? `
+                                <div class="text-neon-red font-medium">
+                                    ${formatCrypto(cost.bnbAmount)} BNB → ${formatCrypto(cost.usdtValue)} USDT
+                                    <div class="text-xs text-gray-400">@ ${formatCrypto(cost.bnbRate)} USDT/BNB</div>
+                                </div>
+                            ` : ''}
+                            ${cost.slippage > 0 ? `<div class="text-orange-400 font-medium mt-1">磨損: ${formatCrypto(cost.slippage)} USDT</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            if (totalPages > 1) {
+                pagination.classList.remove('hidden');
+                document.getElementById('costPageInfo').textContent = `第 ${costCurrentPage} 頁，共 ${totalPages} 頁`;
+            } else {
+                pagination.classList.add('hidden');
+            }
+        }
+
+        console.log('🚀 Alpha積分追蹤器 Firebase版已啟動！');
+    </script>
+</body>
+</html>

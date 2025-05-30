@@ -485,6 +485,51 @@
                     </div>
                 </div>
                 
+                <!-- 圖表區域 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <!-- 月度收益對比 -->
+                    <div class="glass-card p-6 rounded-xl">
+                        <h4 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            💰 月度收益對比 (空投 vs 成本)
+                        </h4>
+                        <div class="relative h-64">
+                            <canvas id="monthlyRevenueChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- BNB匯率趨勢 -->
+                    <div class="glass-card p-6 rounded-xl">
+                        <h4 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            📈 BNB中午匯率趨勢 (近30天)
+                        </h4>
+                        <div class="relative h-64">
+                            <canvas id="bnbRateChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <!-- 每日刷分趨勢 -->
+                    <div class="glass-card p-6 rounded-xl">
+                        <h4 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            📅 每日刷分趨勢 (近30天)
+                        </h4>
+                        <div class="relative h-64">
+                            <canvas id="dailyPointsChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- 成本/磨損分析 -->
+                    <div class="glass-card p-6 rounded-xl">
+                        <h4 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            💸 成本組成分析 (近30天)
+                        </h4>
+                        <div class="relative h-64">
+                            <canvas id="costAnalysisChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- 智能建議 -->
                 <div class="glass-card p-8 rounded-xl">
                     <h4 class="text-xl font-bold mb-6 flex items-center gap-3">
@@ -635,6 +680,12 @@
         // Firebase 連線狀態
         let isFirebaseReady = false;
         let syncStatus = 'offline';
+
+        // 圖表實例
+        let monthlyRevenueChart = null;
+        let bnbRateChart = null;
+        let dailyPointsChart = null;
+        let costAnalysisChart = null;
 
         // 🔥 修正版 Firebase 數據同步函數 - 真正的同步版本
         async function saveToFirebase() {
@@ -1022,6 +1073,7 @@
                     try {
                         updateMonthlyStats();
                         generateReport();
+                        initializeCharts();
                     } catch (error) {
                         console.error('❌ 圖表初始化失敗:', error);
                     }
@@ -1402,6 +1454,265 @@
             
             const suggestionHtml = suggestions.map(s => `<p class="text-yellow-100 mb-2">${s}</p>`).join('');
             document.getElementById('smartSuggestions').innerHTML = suggestionHtml;
+        }
+
+        // 初始化圖表
+        function initializeCharts() {
+            try {
+                initMonthlyRevenueChart();
+                initBnbRateChart();
+                initDailyPointsChart();
+                initCostAnalysisChart();
+            } catch (error) {
+                console.error('初始化圖表失敗:', error);
+            }
+        }
+
+        // 月度收益對比圖
+        function initMonthlyRevenueChart() {
+            const ctx = document.getElementById('monthlyRevenueChart').getContext('2d');
+            
+            // 銷毀舊圖表
+            if (monthlyRevenueChart) {
+                monthlyRevenueChart.destroy();
+            }
+            
+            // 計算近6個月數據
+            const months = [];
+            const revenueData = [];
+            const costData = [];
+            
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date();
+                date.setMonth(date.getMonth() - i);
+                const monthStr = date.toISOString().substr(0, 7);
+                const monthLabel = `${date.getMonth() + 1}月`;
+                
+                const monthRevenue = airdrops
+                    .filter(a => a.date.startsWith(monthStr))
+                    .reduce((sum, a) => sum + a.usdtValue, 0);
+                
+                const monthCost = costs
+                    .filter(c => c.date.startsWith(monthStr))
+                    .reduce((sum, c) => sum + (c.usdtValue || 0) + (c.slippage || 0), 0);
+                
+                months.push(monthLabel);
+                revenueData.push(monthRevenue);
+                costData.push(monthCost);
+            }
+            
+            monthlyRevenueChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [
+                        {
+                            label: '空投收益 (USDT)',
+                            data: revenueData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: '總成本 (USDT)',
+                            data: costData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#9CA3AF' },
+                            grid: { color: 'rgba(156, 163, 175, 0.2)' }
+                        },
+                        x: {
+                            ticks: { color: '#9CA3AF' },
+                            grid: { color: 'rgba(156, 163, 175, 0.2)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // BNB匯率趨勢圖
+        function initBnbRateChart() {
+            const ctx = document.getElementById('bnbRateChart').getContext('2d');
+            
+            if (bnbRateChart) {
+                bnbRateChart.destroy();
+            }
+            
+            // 收集近30天有匯率數據的日期
+            const rateData = costs
+                .filter(c => c.bnbRate && c.bnbRate > 0)
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .slice(-30)
+                .map(c => ({
+                    date: c.date,
+                    rate: c.bnbRate
+                }));
+            
+            const dates = rateData.map(d => d.date.substr(5)); // MM-DD格式
+            const rates = rateData.map(d => d.rate);
+            
+            bnbRateChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'BNB中午匯率 (USDT)',
+                        data: rates,
+                        borderColor: 'rgba(251, 191, 36, 1)',
+                        backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: { color: '#9CA3AF' },
+                            grid: { color: 'rgba(156, 163, 175, 0.2)' }
+                        },
+                        x: {
+                            ticks: { color: '#9CA3AF', maxTicksLimit: 10 },
+                            grid: { color: 'rgba(156, 163, 175, 0.2)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 每日刷分趨勢圖
+        function initDailyPointsChart() {
+            const ctx = document.getElementById('dailyPointsChart').getContext('2d');
+            
+            if (dailyPointsChart) {
+                dailyPointsChart.destroy();
+            }
+            
+            const recentRecords = dailyRecords
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .slice(-30);
+            
+            const dates = recentRecords.map(r => r.date.substr(5));
+            const points = recentRecords.map(r => r.points);
+            
+            dailyPointsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: '每日刷分',
+                        data: points,
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#9CA3AF' },
+                            grid: { color: 'rgba(156, 163, 175, 0.2)' }
+                        },
+                        x: {
+                            ticks: { color: '#9CA3AF', maxTicksLimit: 10 },
+                            grid: { color: 'rgba(156, 163, 175, 0.2)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 成本組成分析圖
+        function initCostAnalysisChart() {
+            const ctx = document.getElementById('costAnalysisChart').getContext('2d');
+            
+            if (costAnalysisChart) {
+                costAnalysisChart.destroy();
+            }
+            
+            const recentCosts = costs
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .slice(-30);
+            
+            const dates = recentCosts.map(c => c.date.substr(5));
+            const gasFees = recentCosts.map(c => c.usdtValue || 0);
+            const slippages = recentCosts.map(c => c.slippage || 0);
+            
+            costAnalysisChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Gas費 (USDT)',
+                            data: gasFees,
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: '磨損 (USDT)',
+                            data: slippages,
+                            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                            borderColor: 'rgba(245, 158, 11, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            stacked: true,
+                            ticks: { color: '#9CA3AF' },
+                            grid: { color: 'rgba(156, 163, 175, 0.2)' }
+                        },
+                        x: {
+                            stacked: true,
+                            ticks: { color: '#9CA3AF', maxTicksLimit: 10 },
+                            grid: { color: 'rgba(156, 163, 175, 0.2)' }
+                        }
+                    }
+                }
+            });
         }
 
         function generateCSV(data, filename) {

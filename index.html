@@ -9,7 +9,7 @@
     <!-- Firebase SDK v9 -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, onSnapshot, setDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, query, orderBy, onSnapshot, setDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
 
         // 🔥 Firebase 配置 - 請替換為您的配置
         const firebaseConfig = {
@@ -28,7 +28,7 @@
         // 將 Firebase 實例暴露到全局
         window.db = db;
         window.firebaseModules = {
-            collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, onSnapshot, setDoc
+            collection, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, query, orderBy, onSnapshot, setDoc
         };
         
         console.log('🔥 Firebase 已初始化');
@@ -636,7 +636,7 @@
         let isFirebaseReady = false;
         let syncStatus = 'offline';
 
-        // 🔥 修正版 Firebase 數據同步函數 - 簡化版本
+        // 🔥 修正版 Firebase 數據同步函數 - 真正的同步版本
         async function saveToFirebase() {
             if (!isFirebaseReady) {
                 console.log('Firebase 尚未準備好，暫存到本地');
@@ -657,13 +657,14 @@
                         bnbRateCache,
                         lastSelectedRateInfo
                     },
-                    lastUpdated: new Date().toISOString()
+                    lastUpdated: new Date().toISOString(),
+                    timestamp: Date.now()
                 };
 
                 // 保存到固定文檔 ID
                 await setDoc(doc(window.db, 'users', 'defaultUser'), userData);
                 
-                console.log('✅ 資料已成功同步到 Firebase');
+                console.log('✅ 資料已成功同步到 Firebase', userData);
                 updateSyncStatus('online');
                 return true;
             } catch (error) {
@@ -681,18 +682,37 @@
 
             try {
                 updateSyncStatus('syncing');
-                const { doc, getDocs, collection } = window.firebaseModules;
+                const { doc, getDoc } = window.firebaseModules;
                 
-                // 嘗試從固定文檔讀取
+                // 從固定文檔讀取數據
                 const docRef = doc(window.db, 'users', 'defaultUser');
-                const docSnap = await getDocs(collection(window.db, 'users'));
+                const docSnap = await getDoc(docRef);
 
-                // 這裡先簡化，只檢查連線能力
-                console.log('🔥 Firebase 連線測試成功');
-                updateSyncStatus('online');
-                return true;
+                if (docSnap.exists()) {
+                    const userData = docSnap.data();
+                    console.log('🔥 從 Firebase 讀取到數據:', userData);
+                    
+                    // 恢復數據
+                    dailyRecords = userData.dailyRecords || [];
+                    airdrops = userData.airdrops || [];
+                    costs = userData.costs || [];
+                    
+                    if (userData.settings) {
+                        targetPoints = userData.settings.targetPoints || 150;
+                        bnbRateCache = userData.settings.bnbRateCache || {};
+                        lastSelectedRateInfo = userData.settings.lastSelectedRateInfo || null;
+                    }
+                    
+                    console.log(`✅ Firebase 數據載入成功: ${dailyRecords.length}筆刷分, ${airdrops.length}筆空投, ${costs.length}筆成本`);
+                    updateSyncStatus('online');
+                    return true;
+                } else {
+                    console.log('🔥 Firebase 中沒有數據，使用本地數據');
+                    updateSyncStatus('online');
+                    return true;
+                }
             } catch (error) {
-                console.error('❌ Firebase 連線失敗:', error);
+                console.error('❌ Firebase 載入失敗:', error);
                 updateSyncStatus('offline');
                 return false;
             }
@@ -957,7 +977,13 @@
                     if (window.db && window.firebaseModules) {
                         isFirebaseReady = true;
                         console.log('🔥 Firebase 連線測試...');
-                        await loadFromFirebase();
+                        const success = await loadFromFirebase();
+                        if (success) {
+                            console.log('🔥 Firebase 數據載入完成');
+                            // 重新載入後更新顯示
+                            document.getElementById('targetPoints').value = targetPoints;
+                            updateDisplay();
+                        }
                     } else {
                         console.log('📱 Firebase 未配置，使用本地模式');
                         updateSyncStatus('offline');
@@ -966,9 +992,6 @@
                     console.error('Firebase 初始化失敗:', error);
                     updateSyncStatus('offline');
                 }
-                
-                document.getElementById('targetPoints').value = targetPoints;
-                updateDisplay();
             }, 1000);
             
             console.log('✅ Alpha積分追蹤器 Firebase最小化修正版初始化完成！');

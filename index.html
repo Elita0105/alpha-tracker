@@ -435,15 +435,26 @@
                     🎁 空投記錄 <span class="text-sm text-gray-400 bg-cyber-gray px-3 py-1 rounded-full">每次扣15分</span>
                 </h3>
                 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
                     <input type="date" id="airdropDate" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all">
                     <input type="text" id="airdropToken" placeholder="代幣名稱" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all">
                     <input type="number" id="airdropAmount" step="0.00000001" placeholder="數量" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all">
-                    <div class="flex gap-2">
-                        <input type="number" id="airdropValue" step="0.00000001" placeholder="USDT收益" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all flex-1">
-                        <button onclick="addAirdrop()" class="btn-green px-6 py-3 rounded-xl">
-                            ➕
-                        </button>
+                    <input type="number" id="airdropGrossAmount" step="0.01" placeholder="成交金額(USDT)" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all">
+                    <input type="number" id="airdropFee" step="0.01" placeholder="手續費(USDT)" class="input-glow bg-cyber-gray text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none border-neon-green transition-all">
+                    <button onclick="addAirdrop()" class="btn-green px-6 py-3 rounded-xl">
+                        ➕ 添加
+                    </button>
+                </div>
+                
+                <!-- 即時計算顯示 -->
+                <div class="bg-cyber-gray rounded-xl p-4 mb-6 border border-gray-600">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-400">即時計算：</span>
+                        <div class="flex gap-4">
+                            <span class="text-neon-blue">成交金額: <span id="previewGross">0.00</span> USDT</span>
+                            <span class="text-neon-red">手續費: <span id="previewFee">0.00</span> USDT</span>
+                            <span class="text-neon-green font-bold">淨收益: <span id="previewNet">0.00</span> USDT</span>
+                        </div>
                     </div>
                 </div>
 
@@ -1022,6 +1033,9 @@
             // 先加載本地數據
             loadFromLocalStorage();
             
+            // 空投表單即時計算
+            setupAirdropCalculation();
+            
             // 等待Firebase初始化
             setTimeout(async () => {
                 try {
@@ -1047,6 +1061,26 @@
             
             console.log('✅ Alpha積分追蹤器 Firebase最小化修正版初始化完成！');
         });
+
+        // 設置空投計算功能
+        function setupAirdropCalculation() {
+            const grossInput = document.getElementById('airdropGrossAmount');
+            const feeInput = document.getElementById('airdropFee');
+            
+            function updatePreview() {
+                const gross = parseFloat(grossInput.value) || 0;
+                const fee = parseFloat(feeInput.value) || 0;
+                const net = gross - fee;
+                
+                document.getElementById('previewGross').textContent = gross.toFixed(2);
+                document.getElementById('previewFee').textContent = fee.toFixed(2);
+                document.getElementById('previewNet').textContent = net.toFixed(2);
+                document.getElementById('previewNet').style.color = net >= 0 ? '#10B981' : '#EF4444';
+            }
+            
+            grossInput.addEventListener('input', updatePreview);
+            feeInput.addEventListener('input', updatePreview);
+        }
 
         // 目標積分變更
         document.getElementById('targetPoints').addEventListener('change', async function() {
@@ -1161,12 +1195,15 @@
             const date = document.getElementById('airdropDate').value;
             const token = document.getElementById('airdropToken').value;
             const amount = parseFloat(document.getElementById('airdropAmount').value);
-            const value = parseFloat(document.getElementById('airdropValue').value);
+            const grossAmount = parseFloat(document.getElementById('airdropGrossAmount').value);
+            const fee = parseFloat(document.getElementById('airdropFee').value);
             
-            if (!date || !token || !amount) {
-                alert('🚨 請填寫日期、代幣名稱和數量');
+            if (!date || !token || !amount || !grossAmount) {
+                alert('🚨 請填寫日期、代幣名稱、數量和成交金額');
                 return;
             }
+            
+            const netValue = grossAmount - (fee || 0);
             
             const existingIndex = airdrops.findIndex(airdrop => 
                 airdrop.date === date && airdrop.token.toLowerCase() === token.toLowerCase()
@@ -1174,24 +1211,51 @@
             
             if (existingIndex !== -1) {
                 const oldAmount = airdrops[existingIndex].amount;
-                const oldValue = airdrops[existingIndex].usdtValue;
+                const oldGross = airdrops[existingIndex].grossAmount;
+                const oldFee = airdrops[existingIndex].fee;
+                const oldNet = airdrops[existingIndex].netValue;
+                
                 airdrops[existingIndex].amount = amount;
-                airdrops[existingIndex].usdtValue = value || 0;
-                alert(`🎁 已更新 ${date} ${token} 的記錄：\n數量：${oldAmount} → ${amount}\nUSDT：${oldValue} → ${value || 0}`);
+                airdrops[existingIndex].grossAmount = grossAmount;
+                airdrops[existingIndex].fee = fee || 0;
+                airdrops[existingIndex].netValue = netValue;
+                // 保持舊的 usdtValue 字段以兼容性
+                airdrops[existingIndex].usdtValue = netValue;
+                
+                alert(`🎁 已更新 ${date} ${token} 的記錄：\n` +
+                      `數量：${oldAmount} → ${amount}\n` +
+                      `成交金額：${oldGross} → ${grossAmount} USDT\n` +
+                      `手續費：${oldFee} → ${fee || 0} USDT\n` +
+                      `淨收益：${oldNet.toFixed(2)} → ${netValue.toFixed(2)} USDT`);
             } else {
                 airdrops.push({
                     id: Date.now(),
                     date,
                     token,
                     amount,
-                    usdtValue: value || 0
+                    grossAmount,
+                    fee: fee || 0,
+                    netValue,
+                    usdtValue: netValue // 兼容性字段
                 });
-                alert(`🎁 已新增 ${date} ${token} 的記錄：${amount}個，價值 ${value || 0} USDT`);
+                alert(`🎁 已新增 ${date} ${token} 的記錄：\n` +
+                      `數量：${amount}\n` +
+                      `成交金額：${grossAmount} USDT\n` +
+                      `手續費：${fee || 0} USDT\n` +
+                      `淨收益：${netValue.toFixed(2)} USDT`);
             }
             
+            // 清空表單
             document.getElementById('airdropToken').value = '';
             document.getElementById('airdropAmount').value = '';
-            document.getElementById('airdropValue').value = '';
+            document.getElementById('airdropGrossAmount').value = '';
+            document.getElementById('airdropFee').value = '';
+            
+            // 重置預覽
+            document.getElementById('previewGross').textContent = '0.00';
+            document.getElementById('previewFee').textContent = '0.00';
+            document.getElementById('previewNet').textContent = '0.00';
+            
             await saveAllData();
             updateDisplay();
         }
@@ -1357,7 +1421,7 @@
             
             const monthlyAirdropValue = airdrops
                 .filter(airdrop => airdrop.date.startsWith(currentMonth))
-                .reduce((sum, airdrop) => sum + airdrop.usdtValue, 0);
+                .reduce((sum, airdrop) => sum + (airdrop.netValue || airdrop.usdtValue || 0), 0);
             
             const monthlyCostValue = costs
                 .filter(cost => cost.date.startsWith(currentMonth))
@@ -1386,7 +1450,7 @@
             const totalPoints = monthlyRecords.reduce((sum, record) => sum + record.points, 0);
             const avgDaily = monthlyRecords.length > 0 ? (totalPoints / monthlyRecords.length).toFixed(1) : 0;
             const airdropCount = monthlyAirdrops.length;
-            const airdropValue = monthlyAirdrops.reduce((sum, airdrop) => sum + airdrop.usdtValue, 0);
+            const airdropValue = monthlyAirdrops.reduce((sum, airdrop) => sum + (airdrop.netValue || airdrop.usdtValue || 0), 0);
             
             const report = `
                 <p class="text-blue-100">📊 刷分天數: ${monthlyRecords.length} 天</p>
@@ -1409,7 +1473,7 @@
             const quarterlyCosts = costs.filter(cost => cost.date >= cutoffDate);
             
             const totalPoints = quarterlyRecords.reduce((sum, record) => sum + record.points, 0);
-            const totalRevenue = quarterlyAirdrops.reduce((sum, airdrop) => sum + airdrop.usdtValue, 0);
+            const totalRevenue = quarterlyAirdrops.reduce((sum, airdrop) => sum + (airdrop.netValue || airdrop.usdtValue || 0), 0);
             const totalCosts = quarterlyCosts.reduce((sum, cost) => sum + (cost.usdtValue || 0) + (cost.slippage || 0), 0);
             const netProfit = totalRevenue - totalCosts;
             
@@ -1468,7 +1532,7 @@
             }
         }
 
-        // 月度收益對比圖
+        // 🔧 修正的月度收益對比圖
         function initMonthlyRevenueChart() {
             const ctx = document.getElementById('monthlyRevenueChart').getContext('2d');
             
@@ -1477,20 +1541,24 @@
                 monthlyRevenueChart.destroy();
             }
             
-            // 計算近6個月數據
+            // 🔧 修正的月份計算邏輯
             const months = [];
             const revenueData = [];
             const costData = [];
             
             for (let i = 5; i >= 0; i--) {
-                const date = new Date();
-                date.setMonth(date.getMonth() - i);
-                const monthStr = date.toISOString().substr(0, 7);
-                const monthLabel = `${date.getMonth() + 1}月`;
+                // 使用更安全的日期計算方式
+                const today = new Date();
+                const targetDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                
+                const year = targetDate.getFullYear();
+                const month = targetDate.getMonth() + 1; // getMonth() 返回 0-11，所以要 +1
+                const monthStr = `${year}-${month.toString().padStart(2, '0')}`; // 格式：2024-12
+                const monthLabel = `${month}月`;
                 
                 const monthRevenue = airdrops
                     .filter(a => a.date.startsWith(monthStr))
-                    .reduce((sum, a) => sum + a.usdtValue, 0);
+                    .reduce((sum, a) => sum + (a.netValue || a.usdtValue || 0), 0);
                 
                 const monthCost = costs
                     .filter(c => c.date.startsWith(monthStr))
@@ -1499,6 +1567,8 @@
                 months.push(monthLabel);
                 revenueData.push(monthRevenue);
                 costData.push(monthCost);
+                
+                console.log(`📅 月份${i}: ${monthStr} -> ${monthLabel} (收益: ${monthRevenue}, 成本: ${monthCost})`);
             }
             
             monthlyRevenueChart = new Chart(ctx, {
@@ -1725,7 +1795,8 @@
             });
             
             data.airdrops?.forEach(airdrop => {
-                csv += `${airdrop.date},空投,${airdrop.token},${formatCrypto(airdrop.amount)},${formatCrypto(airdrop.usdtValue)},,"-15分"\n`;
+                const netValue = airdrop.netValue || airdrop.usdtValue || 0;
+                csv += `${airdrop.date},空投,${airdrop.token},${formatCrypto(airdrop.amount)},${formatCrypto(netValue)},,"-15分"\n`;
             });
             
             data.costs?.forEach(cost => {
@@ -1811,7 +1882,7 @@
             document.getElementById('statsRemaining').textContent = `${stats.remainingPoints} 分`;
             document.getElementById('statsAirdropTotal').textContent = `${airdrops.length} 次`;
             
-            const airdropRevenue = airdrops.reduce((sum, a) => sum + a.usdtValue, 0);
+            const airdropRevenue = airdrops.reduce((sum, a) => sum + (a.netValue || a.usdtValue || 0), 0);
             const totalCostValue = totalCosts.gasFee + totalCosts.slippage;
             const netRevenue = airdropRevenue - totalCostValue;
             
@@ -1877,7 +1948,13 @@
             const endIndex = Math.min(startIndex + itemsPerPage, sorted.length);
             const pageItems = sorted.slice(startIndex, endIndex);
             
-            container.innerHTML = pageItems.map(airdrop => `
+            container.innerHTML = pageItems.map(airdrop => {
+                // 兼容舊數據結構
+                const grossAmount = airdrop.grossAmount || airdrop.usdtValue || 0;
+                const fee = airdrop.fee || 0;
+                const netValue = airdrop.netValue || airdrop.usdtValue || 0;
+                
+                return `
                 <div class="record-card p-4 rounded-xl">
                     <div class="flex justify-between items-center">
                         <div>
@@ -1888,12 +1965,16 @@
                             <span class="text-gray-500 text-sm">${airdrop.date}</span>
                         </div>
                         <div class="text-right">
-                            <div class="text-neon-green font-bold text-lg">${formatCrypto(airdrop.usdtValue)} USDT</div>
+                            <div class="text-sm text-gray-300 mb-1">
+                                ${grossAmount > 0 ? `成交: ${formatCrypto(grossAmount)} USDT` : ''}
+                                ${fee > 0 ? ` | 手續費: ${formatCrypto(fee)} USDT` : ''}
+                            </div>
+                            <div class="text-neon-green font-bold text-lg">淨收益: ${formatCrypto(netValue)} USDT</div>
                             <div class="text-neon-red text-sm">-15分</div>
                         </div>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
             
             if (totalPages > 1) {
                 pagination.classList.remove('hidden');
